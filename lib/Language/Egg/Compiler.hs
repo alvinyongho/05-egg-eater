@@ -124,7 +124,12 @@ compileEnv env (If v e1 e2 l)    = assertType env v TBoolean
     i1s                          = compileEnv env e1
     i2s                          = compileEnv env e2
 
-compileEnv env (Tuple es _)      = error "TBD:compileEnv:Tuple"
+compileEnv env (Tuple es _)      = tupleAlloc (param env <$> es)
+                                ++ tupleCopy env es 0
+                                ++ setTag (Reg EAX) TTuple
+
+
+
 
 compileEnv env (GetItem vE vI _) = error "TBD:compileEnv:GetItem"
 
@@ -176,6 +181,24 @@ immArg _   e             = panic msg (sourceSpan e)
     msg                  = "Unexpected non-immExpr in immArg: " ++ show (strip e)
 
 strip = fmap (const ())
+
+tupleAlloc :: [Arg] -> [Instruction]
+tupleAlloc args =
+    [ IMov (Reg EAX) (Reg ESI)   -- copy current "free address" `esi` into `eax`
+    , IAdd (Reg ESI) (Const (4 * n))   -- increment `esi` by 8
+    ]
+    where
+      n = length args
+
+-- tupleCopy :: Env -> Instruction -> [Arg] -> Int -> [Instruction]
+tupleCopy env [] _ = []
+tupleCopy env (e:es) i =
+              [ IMov (Reg EBX) (immArg env e)           -- store the immediate value of the current element of the tuple
+              , IMov (Sized DWordPtr (RegOffset (4 * i) EAX)) (Reg EBX) -- set the value of the element
+              ]
+              ++ (tupleCopy env es (i+1))
+
+setTag r ty = [ IAdd r (typeTag ty) ]
 
 --------------------------------------------------------------------------------
 -- | Arithmetic
