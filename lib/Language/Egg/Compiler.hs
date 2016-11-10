@@ -149,10 +149,13 @@ compileBind env (x, e) = (env', is)
 compilePrim1 :: Tag -> Env -> Prim1 -> IExp -> [Instruction]
 compilePrim1 l env Add1    v = compilePrim2 l env Plus  v (Number 1 l)
 compilePrim1 l env Sub1    v = compilePrim2 l env Minus v (Number 1 l)
-compilePrim1 l env IsNum   v = error "TBD:compilePrim1:isNum"
-compilePrim1 l env IsBool  v = error "TBD:compilePrim1:isBool"
-compilePrim1 l env IsTuple v = error "TBD:compilePrim1:isTuple"
+compilePrim1 l env IsNum   v = isType l env v TNumber
+compilePrim1 l env IsBool  v = isType l env v TBoolean
+compilePrim1 l env IsTuple v = isType l env v TTuple
 compilePrim1 _ env Print   v = call (Builtin "print") [param env v]
+
+
+
 
 compilePrim2 :: Tag -> Env -> Prim2 -> IExp -> IExp -> [Instruction]
 compilePrim2 _ env Plus    = arith     env addOp
@@ -210,6 +213,21 @@ overflow = IJo (DynamicErr ArithOverflow)
 --------------------------------------------------------------------------------
 
 -- | @assertType t@ tests if EAX is a value of type t and exits with error o.w.
+isType :: Tag -> Env -> IExp -> Ty -> [Instruction]
+isType l env v ty
+ =   cmpType env v ty
+ ++ [ IJe  lTrue
+    , IMov (Reg EAX) (repr False)
+    , IJmp lDone
+    , ILabel lTrue
+    , IMov (Reg EAX) (repr True)
+    , ILabel lDone
+    ]
+    where
+      lTrue = BranchTrue i
+      lDone = BranchDone i
+      i     = snd l
+
 assertType :: Env -> IExp -> Ty -> [Instruction]
 assertType env v ty
   =   cmpType env v ty
