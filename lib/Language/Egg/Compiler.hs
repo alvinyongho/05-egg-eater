@@ -131,7 +131,7 @@ compileEnv env (Tuple es _)      = tupleAlloc (param env <$> es)
 
 
 
-compileEnv env (GetItem vE vI _) = error "TBD:compileEnv:GetItem"
+compileEnv env (GetItem vE vI _) = assertType env vE TTuple
 
 compileEnv env (App f vs _)      = call (Builtin f) (param env <$> vs)
 
