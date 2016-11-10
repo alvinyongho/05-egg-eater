@@ -129,9 +129,10 @@ compileEnv env (Tuple es _)      = tupleAlloc (param env <$> es)
                                 ++ setTag (Reg EAX) TTuple
 
 
-
-
 compileEnv env (GetItem vE vI _) = assertType env vE TTuple
+                                -- ++ [ IMov (Reg EAX) (immArg env vI) ]
+                                -- ++ ISub (Reg EAX) typeTag TTuple
+                                -- ++ [ IMov (Reg EAX) Sized DWordPtr (RegOffset (4 * fieldOffset fld) EAX)]
 
 compileEnv env (App f vs _)      = call (Builtin f) (param env <$> vs)
 
