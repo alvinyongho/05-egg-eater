@@ -21,6 +21,14 @@ import           Language.Egg.Normalizer (anormal)
 import           Language.Egg.Asm        (asm)
 
 
+
+cc :: Text -> Text -> IO()
+cc str = putStrLn . compiler ""
+
+
+-- anormalized str =  anormalizer str
+
+
 --------------------------------------------------------------------------------
 compiler :: FilePath -> Text -> Text
 --------------------------------------------------------------------------------
@@ -28,6 +36,7 @@ compiler :: FilePath -> Text -> Text
 
 compiler f = parse f >>> check >>> anormal >>> tag >>> compile >>> asm
 
+anormalizer f = parse f >>> check >>> anormal
 --------------------------------------------------------------------------------
 -- | The compilation (code generation) works with AST nodes labeled by @Tag@
 --------------------------------------------------------------------------------
@@ -124,15 +133,21 @@ compileEnv env (If v e1 e2 l)    = assertType env v TBoolean
     i1s                          = compileEnv env e1
     i2s                          = compileEnv env e2
 
-compileEnv env (Tuple es _)      = tupleAlloc (param env <$> es)
+compileEnv env (Tuple es _)      = tupleAlloc (length es)
                                 ++ tupleCopy env es 0
                                 ++ setTag (Reg EAX) TTuple
 
 
-compileEnv env (GetItem vE vI _) = assertType env vE TTuple
-                                -- ++ [ IMov (Reg EAX) (immArg env vI) ]
-                                -- ++ ISub (Reg EAX) typeTag TTuple
-                                -- ++ [ IMov (Reg EAX) Sized DWordPtr (RegOffset (4 * fieldOffset fld) EAX)]
+-- need to figure out how get the offset from vI
+compileEnv env (GetItem vE vI _) = assertType env vE TTuple   -- check that vE is a pointer
+                                ++ [ IMov (Reg EAX) (immArg env vE) ] -- load pointer into eax
+                                ++ [ ISub (Reg EAX) (typeTag TTuple) ] -- remove tag bits to get address
+                                ++ [ IMov (Reg ECX) (immArg env vI) ]  -- store the immedate value of the index
+                                -- ++ [ IMul (Reg ECX) (Const 4) ] -- Multiply ECX by 4
+                                -- ++ [ IAdd (Reg EBX) ]
+                                ++ [ IMov (Reg EAX) (Sized DWordPtr (RegIndex EAX ECX))]
+
+                                        -- [  EAX + (4 * ECX) ]
 
 compileEnv env (App f vs _)      = call (Builtin f) (param env <$> vs)
 
@@ -183,21 +198,26 @@ immArg _   e             = panic msg (sourceSpan e)
 
 strip = fmap (const ())
 
-tupleAlloc :: [Arg] -> [Instruction]
+-- tupleAlloc :: [Arg] -> [Instruction]
 tupleAlloc args =
     [ IMov (Reg EAX) (Reg ESI)   -- copy current "free address" `esi` into `eax`
-    , IAdd (Reg ESI) (Const (4 * n))   -- increment `esi` by 8
+    , IAdd (Reg ESI) (Const (4 * args))   -- increment `esi` by 8
     ]
-    where
-      n = length args
+    -- where
+    --   n = length args
 
 -- tupleCopy :: Env -> Instruction -> [Arg] -> Int -> [Instruction]
 tupleCopy env [] _ = []
 tupleCopy env (e:es) i =
               [ IMov (Reg EBX) (immArg env e)           -- store the immediate value of the current element of the tuple
-              , IMov (Sized DWordPtr (RegOffset (4 * i) EAX)) (Reg EBX) -- set the value of the element
+              , IMov (pairAddr i) (Reg EBX) -- set the value of the element
               ]
               ++ (tupleCopy env es (i+1))
+
+
+-- pairAddr :: Field -> Arg
+pairAddr offset = Sized DWordPtr (RegOffset (4 * offset) EAX)
+
 
 setTag r ty = [ IAdd r (typeTag ty) ]
 

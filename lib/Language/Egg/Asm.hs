@@ -92,6 +92,7 @@ instrAsm IRet           =        "  ret"
 regAsm :: Reg -> Text
 regAsm EAX = "eax"
 regAsm EBX = "ebx"
+regAsm ECX = "ecx"
 regAsm ESP = "esp"
 regAsm EBP = "ebp"
 regAsm ESI = "esi"

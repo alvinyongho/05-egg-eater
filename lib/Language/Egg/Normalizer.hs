@@ -75,6 +75,8 @@ stitch :: Binds a -> AnfExpr a -> AnfExpr a
 --------------------------------------------------------------------------------
 stitch bs e = bindsExpr [ (x, e) | (x, (e, _)) <- reverse bs] e (getLabel e)
 
+-- skooch bs e = exprsExpr es l
+
 --------------------------------------------------------------------------------
 -- | `imms i es` takes as input a "start" counter `i` and expressions `es`, and
 --   and returns an output `(i', bs, es')` where
