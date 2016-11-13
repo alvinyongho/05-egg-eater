@@ -133,7 +133,7 @@ compileEnv env (If v e1 e2 l)    = assertType env v TBoolean
     i1s                          = compileEnv env e1
     i2s                          = compileEnv env e2
 
-compileEnv env (Tuple es _)      = tupleAlloc (length es)
+compileEnv env (Tuple es _)      = tupleAlloc (length es+8)      -- ALLOCATE SPACE FOR THE SIZE OF THE TUPLE
                                 ++ addSize env (length es)     -- add the size to the EAX
                                 ++ tupleCopy env es 1          -- add the rest to EAX+4 onwards
                                 ++ setTag (Reg EAX) TTuple
@@ -142,11 +142,13 @@ compileEnv env (Tuple es _)      = tupleAlloc (length es)
 -- need to figure out how get the offset from vI
 compileEnv env (GetItem vE vI _) = assertType env vE TTuple   -- check that vE is a pointer
                                 ++ [ IMov (Reg EAX) (immArg env vE) ] -- load pointer into eax
+                                -- ++ [ ISub (Reg EAX) (Const 0) ] -- BSSS!!!!!
+
                                 ++ [ ISub (Reg EAX) (typeTag TTuple) ] -- remove tag bits to get address
                                 ++ [ IMov (Reg ECX) (immArg env vI) ]  -- store the immedate value of the index
-                                -- ++ [ IMul (Reg ECX) (Const 4) ] -- Multiply ECX by 4
-                                -- ++ [ IAdd (Reg EBX) ]
                                 ++ [ IMov (Reg EAX) (Sized DWordPtr (RegIndex EAX ECX))]
+                                -- ++ [ IAdd (Reg EAX) (Const 8)]
+
 
                                         -- [  EAX + (4 * ECX) ]
 
@@ -207,6 +209,8 @@ tupleAlloc args =
     -- where
     --   n = length args
 
+
+--- IS IT *2??? OR SHOULD I USE SOMETHING ELSE
 addSize env es =
   [ IMov (Reg EBX) (Const (es*2))          -- store the immediate value of the current element of the tuple
   , IMov (pairAddr 0) (Reg EBX) -- set the value of the element
