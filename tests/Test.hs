@@ -1,11 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
--- module Test where 
+-- module Test where
 
 import Test.Tasty
 import Text.Printf
 import Control.Exception
 import System.Exit
-import Language.Egg.Runner 
+import Language.Egg.Runner
 import Language.Egg.Types      hiding (Result)
 
 main :: IO ()
@@ -142,6 +142,6 @@ eggTests sc =
 
 
 
-yourTests sc = 
-  [ -- Your tests go here 
+yourTests sc =
+  [ mkTest sc "pair"      File      (rLines ["(10, 20)"])
   ]

@@ -134,7 +134,8 @@ compileEnv env (If v e1 e2 l)    = assertType env v TBoolean
     i2s                          = compileEnv env e2
 
 compileEnv env (Tuple es _)      = tupleAlloc (length es)
-                                ++ tupleCopy env es 0
+                                ++ addSize env (length es)     -- add the size to the EAX
+                                ++ tupleCopy env es 1          -- add the rest to EAX+4 onwards
                                 ++ setTag (Reg EAX) TTuple
 
 
@@ -205,6 +206,11 @@ tupleAlloc args =
     ]
     -- where
     --   n = length args
+
+addSize env es =
+  [ IMov (Reg EBX) (Const (es*2))          -- store the immediate value of the current element of the tuple
+  , IMov (pairAddr 0) (Reg EBX) -- set the value of the element
+  ]
 
 -- tupleCopy :: Env -> Instruction -> [Arg] -> Int -> [Instruction]
 tupleCopy env [] _ = []
