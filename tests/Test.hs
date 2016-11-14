@@ -146,4 +146,5 @@ yourTests sc =
   [ mkTest sc "pair-2"      File      (rLines ["(10, 20)"])
   , mkTest sc "pair"    File      (rLines ["(10, (10, 20))"])
   , mkTest sc "tuple-01d"  File      (rLines ["10", "20", "30", "60"])
+  , mkTest sc "tuple-test" File     (rLines["(1, 2, 3, (4, 5))"])
   ]
