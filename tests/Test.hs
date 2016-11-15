@@ -150,7 +150,7 @@ yourTests sc =
   , mkTest sc "tuple-03d"     File      (rLines ["(30, 20, 10)"])
   , mkTest sc "err-tuple-00"  File      (Left "Error: tuple index too large.")
   , mkTest sc "err-tuple-01"  File      (Left "Error: tuple index too small.")
-  , mkTest sc "err-tuple-02"  File      (Left "Error: tuple index too small.")
-  , mkTest sc "err-tuple-03"  File      (Left "Error: tuple index too large.")
+  , mkTest sc "err-tuple-02"  File      (Left "Error: tuple index too large.")
+  , mkTest sc "err-tuple-03"  File      (Left "Error: tuple index too small.")
   , mkTest sc "list-5"        File      (dynamicError TTuple)
   ]
