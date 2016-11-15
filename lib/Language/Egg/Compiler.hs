@@ -143,6 +143,7 @@ compileEnv env (Tuple es _)      = tupleAlloc (length es)    -- allocate space f
 -- need to figure out how get the offset from vI
 compileEnv env (GetItem vE vI _) = assertType env vE TTuple   -- check that vE is a pointer
                                 ++ assertType env vI TNumber
+                                ++ assertBound env vE vI
                                 ++ [ IMov (Reg EBX) (immArg env vE) ] -- load pointer into eax
                                 -- ++ [ IMul (Reg EAX) (Const 4)]
                                 ++ [ ISub (Reg EBX) (typeTag TTuple) ] -- remove tag bits to get address location
@@ -335,6 +336,54 @@ assertType :: Env -> IExp -> Ty -> [Instruction]
 assertType env v ty
   =   cmpType env v ty
   ++ [ IJne (DynamicErr (TypeError ty))    ]
+
+
+assertLB env ve vi
+  =  [ IMov (Reg ECX) (immArg env vi) ]
+  ++ [ ISar (Reg ECX) (Const 1)]
+  ++ [ ICmp (Reg ECX) (Const 0)]
+  ++ [ IJl (DynamicErr (IndexLow))]
+
+assertUB env ve vi
+  =
+       [ IMov (Reg EBX) (immArg env ve) ]  -- get the address ve
+    ++ [ ISub (Reg EBX) (typeTag TTuple) ] -- remove the tag
+    ++ [ IMov (Reg EAX) (Sized DWordPtr (RegOffset 0 EBX))] -- retrieve the size
+    ++ [ IMov (Reg ECX) (immArg env vi) ]
+    ++ [ ICmp (Reg ECX) (Reg EAX)]
+    ++ [ IJg (DynamicErr (IndexHigh))]
+
+  --
+  --   ++ [ IMov (Reg ECX) (immArg env vi) ]  --
+  --   ++ [ ISar (Reg ECX) (Const 1)]  -- this is the index
+  --
+  --
+  --   -- ++ [ IAdd (Reg ECX) (Const 1) ] -- increment the index by one
+  --   ++ [ ISar (Reg EAX) (Const 1)]
+  --   -- repr ((immArg env vI))
+  --
+  --
+  -- ++ [ ICmp (Reg EAX) (Reg ECX)]
+  -- ++ [ IJg (DynamicErr (IndexHigh))]
+
+
+assertBound env ve vi
+  =
+  -- Lower Bound Check
+        assertLB env ve vi
+     ++ assertUB env ve vi
+  -- -- Upper Bound Check
+  -- -- get the address where tuple is located
+  -- ++ [ IMov (Reg EBX) (immArg env ve)]
+  -- ++ [ IMov (Reg ECX) (Const 0)] -- we're going for index 0
+  -- ++ [ IMov (Reg EAX) (Sized DWordPtr (RegIndex ECX EBX))] -- eax = retrieve the word at index 0
+  --
+  -- ++ [ IMov (Reg ECX) (immArg env vi) ]
+  -- ++ [ ISar (Reg ECX) (Const 1)]   -- ecx = # of the index
+  --
+  --
+  -- ++ [ ICmp (Reg ECX) (Reg EAX)]   -- compare that with size of the tuple
+  -- ++ [ IJg (DynamicErr (IndexHigh))]  -- if the in
 
 cmpType :: Env -> IExp -> Ty -> [Instruction]
 cmpType env v ty

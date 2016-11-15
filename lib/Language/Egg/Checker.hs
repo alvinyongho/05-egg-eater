@@ -141,4 +141,4 @@ errLargeNum   l n = mkError (printf "Number '%d' is too large" n) l
 errUnboundVar l x = mkError (printf "Unbound variable '%s'" x) l
 errUnboundFun l f = mkError (printf "Function '%s' is not defined" f) l
 errCallArity  l f = mkError (printf "Wrong arity of arguments at call of %s" f) l
-errInvalidTuple l = mkError (printf "Invalid Tuple") l
+errInvalidTuple l = mkError (printf "Expected a tuple") l
