@@ -133,19 +133,31 @@ compileEnv env (If v e1 e2 l)    = assertType env v TBoolean
     i1s                          = compileEnv env e1
     i2s                          = compileEnv env e2
 
-compileEnv env (Tuple es _)      = tupleAlloc (length es+8)    -- allocate + padding LOL  -- ALLOCATE SPACE FOR THE SIZE OF THE TUPLE -- change to 8 previously
-                                ++ addSize env (length es)     -- add the size to the EAX
-                                ++ tupleCopy env es 1          -- add the rest to EAX+4 onwards
-                                ++ setTag (Reg EAX) TTuple
+compileEnv env (Tuple es _)      = tupleAlloc (length es)    -- allocate space for the size [0] and for padding [length es + 1]
+                                ++ addSize env (length es)     -- add the size to the first index [0]
+                                ++ tupleCopy env es 1          -- add the rest to [1] and onwards
+                                ++ addPad env ((length es) + 1) -- THAT FINAL PADDING (We have to prevent accessing later but set it as 0?)
+                                ++ setTag (Reg EAX) TTuple     -- the the tag of EAX to a TTuple
 
 
 -- need to figure out how get the offset from vI
 compileEnv env (GetItem vE vI _) = assertType env vE TTuple   -- check that vE is a pointer
-                                ++ [ IMov (Reg EAX) (immArg env vE) ] -- load pointer into eax
+                                ++ assertType env vI TNumber
+                                ++ [ IMov (Reg EBX) (immArg env vE) ] -- load pointer into eax
                                 -- ++ [ IMul (Reg EAX) (Const 4)]
-                                ++ [ ISub (Reg EAX) (typeTag TTuple) ] -- remove tag bits to get address
-                                ++ [ IMov (Reg ECX) (immArg env vI) ]  -- store the immedate value of the index
-                                ++ [ IMov (Reg EAX) (Sized DWordPtr (RegIndex EAX ECX))]
+                                ++ [ ISub (Reg EBX) (typeTag TTuple) ] -- remove tag bits to get address location
+--move toebx
+
+                                ++ [ IMov (Reg ECX) (immArg env vI) ]
+                                ++ [ ISar (Reg ECX) (Const 1)]  --- WHYY????
+                                     -- get the immedate index
+
+                                -- ++ [ compileImm env vI
+                                --    , ISar (Reg EAX) (Const 1)
+                                --    ]
+                                ++ [ IAdd (Reg ECX) (Const 1) ] -- increment the index by one
+                                ++ [ IMov (Reg EAX) (Sized DWordPtr (RegIndex EBX ECX))] -- EAX = EAX + ECX * 4
+                                -- repr ((immArg env vI))
 
 compileEnv env (App f vs _)      = call (Builtin f) (param env <$> vs)
 
@@ -199,25 +211,67 @@ strip = fmap (const ())
 -- tupleAlloc :: [Arg] -> [Instruction]
 tupleAlloc args =
     [ IMov (Reg EAX) (Reg ESI)   -- copy current "free address" `esi` into `eax`
-    , IAdd (Reg ESI) (Const (4 * args))   -- increment `esi` by 8
+    , IMov (Sized DWordPtr (RegOffset 0 EAX)) (repr args)
+    , IAdd (Reg ESI) (Const size)   -- increment `esi` by 8
     ]
-    -- where
-    --   n = length args
+    where
+      size = 4 * roundToEven(args+1)
 
 
---- IS IT *2??? OR SHOULD I USE SOMETHING ELSE
+
+isOdd :: Int -> Bool
+isOdd n = mod n 2 == 1
+
+roundToEven :: Int -> Int
+roundToEven n
+  | isOdd n    = n+1
+  | otherwise  = n
+
 addSize env es =
-  [ IMov (Reg EBX) (Const (es*2))
+  [ IMov (Reg EBX) (Const es)
+  , IShl (Reg EBX) (Const 1)    -- multiply es by 2 because thats the size
   , IMov (pairAddr 0) (Reg EBX) -- set the value of the element
   ]
+  -- ++ setTag (Reg EBX) TNumber
+
+
+
+
+
+  -- IMov (Reg ESI) (RegOffset 4 ESP)
+  -- , IAdd (Reg ESI) (Const 8)
+  -- , IAnd (Reg ESI) (HexConst 0xFFFFFFF8)
+
+addPad env loc =
+     [ IMov (Reg EBX) (Const 0) ]
+  ++ [ IMov (pairAddr loc) (Reg EBX) ]
+  -- [ IAdd (pairAddr loc) (Const 8)]
+  -- ++ [ IAnd (pairAddr loc) (HexConst 0xFFFFFFF8)]
+
+
+
+
 
 -- tupleCopy :: Env -> Instruction -> [Arg] -> Int -> [Instruction]
 tupleCopy env [] _ = []
+-- tupleCopy env e i =
+--               [ IMov (Reg EBX) (immArg env e)           -- store the immediate value of the current element of the tuple
+--               , IMov (pairAddr i) (Reg EBX) -- set the value of the element
+--               ]
+--               ++ (tupleCopy env [] (i+1))
 tupleCopy env (e:es) i =
-              [ IMov (Reg EBX) (immArg env e)           -- store the immediate value of the current element of the tuple
-              , IMov (pairAddr i) (Reg EBX) -- set the value of the element
+              [ IMov (Reg EBX) (immArg env e)]           -- store the immediate value of the current element of the tuple
+
+            -- [ compileImm env e
+            --      ]
+
+              -- , ISub (Reg EBX) (typeTag TNumber)   -- remove tag bits?
+              -- , ISal (Reg EBX) (Const 1)
+              ++[IMov (pairAddr i) (Reg EBX) -- set the value of the element
               ]
               ++ (tupleCopy env es (i+1))
+
+
 
 
 -- pairAddr :: Field -> Arg

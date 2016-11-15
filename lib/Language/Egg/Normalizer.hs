@@ -75,6 +75,9 @@ stitch :: Binds a -> AnfExpr a -> AnfExpr a
 --------------------------------------------------------------------------------
 stitch bs e = bindsExpr [ (x, e) | (x, (e, _)) <- reverse bs] e (getLabel e)
 
+
+-- stitch2 bs e = bindsExpr [ (x, e) | (x, (e, _)) <- bs] e (getLabel e)
+
 -- skooch bs e = exprsExpr es l
 
 --------------------------------------------------------------------------------
@@ -125,9 +128,9 @@ imm i (Tuple es l)      = (i'', bs', mkId x l)
     (i'', x)            = fresh l i'
     bs'                 = (x, (Tuple vs l, l)) : bs
 
-imm i (GetItem e1 e2 l) = (i'', bs', mkId x l)
+imm i e@(GetItem e1 e2 l) = (i'', bs', mkId x l)
   where
-    (i', bs, [v1, v2])   = imms i [e1, e2]
+    (i', bs, [v1, v2])  = imms i [e1, e2]
     (i'', x)            = fresh l i'
     bs'                 = (x, (GetItem v1 v2 l, l)) : bs
 
